@@ -213,8 +213,8 @@ void driveToPositionOne () {
     while (MAX_ROTATE_ITERATIONS > iterations++) {
         int right_dir = irDirRight ();
         int left_dir = irDirLeft ();
-        if (LEFT_SENSOR_CENTER == right_dir &&
-            RIGHT_SENSOR_CENTER == left_dir) {
+        if (LEFT_SENSOR_CENTER == left_dir &&
+            RIGHT_SENSOR_CENTER == right_dir) {
             int left_power = irPowerLeft ();
             int right_power = irPowerRight ();
             if (POWER_SAME_THRESHOLD > abs (left_power - right_power)) {
