@@ -118,39 +118,6 @@ int irPowerRight() {
 	}
 }
 
-
-int ID_IR_Pos(char IR_l, char IR_r) {
-	//if (IRSensorRegion(IR_l, false) == 1 && IRSensorRegion()
-	//	writeDebugStreamLine("1");
-	//	return 1;
-	//else if (IRSensorRegion(IR_l, false) == 1 && IRSensorRegion(IR_r, false) == 1)
-	//	return 2;
-	//else if (IRSensorRegion(IR_l, false) == 2 && IRSensorRegion(IR_r, false) == 2)
-	//	return 3;
-	//return 1;
-	writeDebugStreamLine("IR_l: %i, IR_r: %i", IRSensorRegion(IR_l, false), IRSensorRegion(IR_r, false));
-	writeDebugStreamLine("IR_L P: %i, IR_R P: %i", irPowerLeft(), irPowerRight());
-
-	return 0;
-}
-
-void initialDrive() {
-	forwardTime(18, DRIVE_MOTORS);
-}
-
-void IR_drive_to_center_goal(int goalPos) {
-	switch (goalPos) {
-		case(1):
-			backwardTime(40, DRIVE_MOTORS);
-
-		case(2):
-			backwardTime(40, DRIVE_MOTORS);
-
-		case(3):
-			backwardTime(40, DRIVE_MOTORS);
-	}
-}
-
 void dump_balls() {
 	servo[BALL_DUMP] = 120;
 	wait10Msec(10);
@@ -214,12 +181,71 @@ void irForward() {
 	stopMotors(DRIVE_MOTORS);
 }
 
-task main() {
+void driveToPositionOne() {
+	setSpeeds(50, 50);
+	wait10Msec(10);
 
-	int goalPos = ID_IR_Pos(IR_l, IR_r);
+    setSpeeds(-50, 50);
+    wait10Msec(100);
+
+    setSpeeds(50, 50);
+
+    int iterations = 0;
+    const int MAX_FORWARD_ITERATIONS = 30;
+
+    while(MAX_FORWARD_ITERATIONS > iterations++) {
+        int right = irDirRight ();
+        if (9 == right) {
+            break;
+        }
+        wait10Msec(10);
+    }
+    writeDebugStreamLine("Finished going forward after %d iterations", iterations);
+
+    setSpeeds(50, -50);
+
+    iterations = 0;
+    const int MAX_ROTATE_ITERATIONS = 20;
+    const int POWER_SAME_THRESHOLD = 10;
+    while(MAX_ROTATE_ITERATIONS > iterations++) {
+        int right_dir = irDirRight();
+        int left_dir = irDirLeft ();
+        if (5 == right_dir && 5 == left_dir) {
+            int left_power = irPowerLeft();
+            int right_power = irPowerRight ();
+            if (POWER_SAME_THRESHOLD > abs(left_power - right_power)) {
+                break;
+            } else {
+                writeDebugStreamLine("Powers: %d %d", left_power, right_power);
+            }
+        } else {
+            writeDebugStreamLine("Directions: %d %d", left_dir, right_dir);
+        }
+        wait10Msec(10);
+    }
+    setSpeeds(0, 0);
+    writeDebugStreamLine("Finished turning right after %d iterations", iterations);
+}
+
+void driveToCenterGoal () {
+    int left = irDirLeft ();
+    int right = irDirRight ();
+
+    if (5 != left || 5 != right) {
+        driveToPositionOne();
+    }
+
+    irForward();
+}
+
+task main() {
 	initialize_robot();
-	irForward();
+
 	//waitForStart();
+
+    driveToCenterGoal();
+    
+
 	//initialDrive();
 	//IR_drive_to_center_goal(goalPos);
 	//dump_balls();
