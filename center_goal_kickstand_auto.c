@@ -4,7 +4,13 @@
 #pragma config(Motor, mtr_S1_C1_1, motorD, tmotorTetrix, openLoop)
 #pragma config(Motor, mtr_S1_C1_2, LIFT, tmotorTetrix, openLoop, encoder)
 #pragma config(Motor, mtr_S1_C3_1, LEFT_DRIVE, tmotorTetrix, openLoop, encoder)
-#pragma config(Motor, mtr_S1_C3_2, RIGHT_DRIVE, tmotorTetrix, openLoop, reversed, encoder)
+#pragma config(Motor,                                                          \
+               mtr_S1_C3_2,                                                    \
+               RIGHT_DRIVE,                                                    \
+               tmotorTetrix,                                                   \
+               openLoop,                                                       \
+               reversed,                                                       \
+               encoder)
 #pragma config(Servo, srvo_S1_C2_1, TUBE_MAN_B, tServoStandard)
 #pragma config(Servo, srvo_S1_C2_2, servo2, tServoNone)
 #pragma config(Servo, srvo_S1_C2_3, servo3, tServoNone)
@@ -62,138 +68,220 @@ int irPowerRight () {
 }
 
 void setSpeeds (int left, int right) {
-    motor[LEFT_DRIVE] = left;
-    motor[RIGHT_DRIVE] = right;
+    motor[LEFT_DRIVE] = right;
+    motor[RIGHT_DRIVE] = left;
 }
 
-void setSpeedsCrawlAhead () { setSpeeds (20, 20); }
+void setSpeedsCrawlAhead () { setSpeeds (80, 80); }
 void setSpeedsCrawlBack () { setSpeeds (-20, -20); }
-void setSpeedsSpiritedAhead () { setSpeeds (50, 50); }
+void setSpeedsSlowlyAhead () { setSpeeds (20, 20); }
+void setSpeedsSpiritedAhead () { setSpeeds (40, 40); }
+void setSpeedsALittleMoreAhead () { setSpeeds (50, 50); }
 void setSpeedsAllAheadFull () { setSpeeds (100, 100); }
-void setSpeedsLeftTurn () { setSpeeds (20, 40); }
-void setSpeedsRightTurn () { setSpeeds (40, 20); }
-void setSpeedsLeftPivot () { setSpeeds (-50, 50); }
-void setSpeedsRightPivot () { setSpeeds (50, -50); }
+void setSpeedsLeftTurn () { setSpeeds (-0, 100); }
+void setSpeedsRightTurn () { setSpeeds (100, -0); }
+
+void setSpeedsLeftTurnSmall () { setSpeeds (0, 70); }
+void setSpeedsRightTurnSmall () { setSpeeds (70, 0); }
+
+void setSpeedsLeftPivot () { setSpeeds (-40, 40); }
+void setSpeedsRightPivot () { setSpeeds (40, -40); }
+
 void setSpeedsStop () { setSpeeds (0, 0); }
 
-void sleep (float seconds) { wait10Msec (int(seconds * 100.0)); }
+void sleep (float seconds) { wait10Msec (seconds * 100.0); }
 
-// Undefine this if you want to point the sensors inward
-#define SENSORS_FORWARD 1
-
-#ifdef SENSORS_FORWARD
 const int LEFT_SENSOR_CENTER = 5;
 const int RIGHT_SENSOR_CENTER = 5;
-#else
-const int LEFT_SENSOR_CENTER = 1;
-const int RIGHT_SENSOR_CENTER = 9;
-#endif
 
 void dumpBallsInCenterGoal () {
-    const float RAISE_LOWER_DURATION = 0.5;
+    const float RAISE_LOWER_DURATION = 2.6;
     // Setting this initially low, just in case.
     const float SERVO_DUMP_DURATION = 1.0;
     // raise the dumping arm
+
+    writeDebugStreamLine ("Raising linear slide");
     motor[LIFT] = 100;
     sleep (RAISE_LOWER_DURATION);
     motor[LIFT] = 0;
 
-    servo[BALL_DUMP] = 120;
+    writeDebugStreamLine ("Dumpin the game elements");
+    servo[BALL_DUMP] = 160;
     sleep (SERVO_DUMP_DURATION);
+    writeDebugStreamLine ("Returning servo to start position");
     servo[BALL_DUMP] = 0;
 
+    writeDebugStreamLine ("Lowering linear slide");
     motor[LIFT] = -100;
     sleep (RAISE_LOWER_DURATION);
+    writeDebugStreamLine ("Finished with game element dump");
     motor[LIFT] = 0;
+}
+
+void backUntilTwoFives () {
+    writeDebugStreamLine ("Position One: Forward Until IR");
+    int iterations = 0;
+    const int MAX_ITERATIONS = 15;
+    setSpeedsCrawlBack ();
+    while (MAX_ITERATIONS > iterations++) {
+        int left_dir = irDirLeft ();
+        int right_dir = irDirRight ();
+        if (LEFT_SENSOR_CENTER == left_dir &&
+            RIGHT_SENSOR_CENTER == right_dir) {
+            break;
+        }
+        sleep (0.1);
+    }
+}
+
+void driveFor (int left, int right, float time) {
+    setSpeeds (left, right);
+    sleep (time);
+}
+
+void kickstandPositionOne () {}
+
+void kickstandPositionTwo () {
+    // Angle slightly to the right
+    driveFor (30, -60, .25);
+    // Go forward a bit
+    driveFor (60, 60, .25);
+    // Angle right towards the kickstand
+    driveFor (60, 100, 1.0);
+}
+
+void kickstandPositionThree () {
+    // Turn left
+    driveFor (100, -100, .25);
+    // Forward a bit
+    driveFor (50, 50, .25);
+    // Turn right towards the center element
+    driveFor (-100, 100, .5);
+    // Drive in, angling right, to knock it down.
+    driveFor (60, 100, 1.0);
+}
+
+void kickstandIRExperimental () {
+    // Back up for a second.
+    driveFor (-60, -60, 0.5);
+    // And then turn a bit to the right
+    driveFor (60, -60, .25);
+
+    // Now drive forward unti the IR beacon is on our left.
+    setSpeeds (50, 50);
+    int iterations = 0;
+    int MAX_FWD_ITER = 20;
+    while (MAX_FWD_ITER > iterations++) {
+        int left_ir = irDirLeft ();
+
+        if (1 >= left_ir) {
+            break;
+        }
+        sleep (.05);
+    }
+
+    // And now start running left in towards the goal.
+    driveFor (0, 100, .5);
+    // And ramming speed.
+    driveFor (100, 100, .5);
 }
 
 // Assumes that we've just dumped in the center goal. We're a few inches
 // away from the game element. So we'll nedd to back up a bit, turn right
 // 45 degrees, drive forward a bit, turn left 45 degrees and then drive
 // forward in a spirited way.
-void knockOverKickstand () {
-    const float BACKUP_DURATION = 0.5;
-    const float ROTATE_DURATION = 1.0;
-    const float FIRST_FORWARD_DURATION = 1.0;
-    const float RAMMING_DURATION = 2.0;
+void knockOverKickstand (int position) {
+#ifdef USE_CHOSEN_POSITION
+    if (1 == position) {
+        kickstandPositionOne ();
+    } else if (2 == position) {
+        kickstandPositionTwo ();
+    } else if (3 == position) {
+        kickstandPositionThree ();
+    } else {
+        writeDebugStreamLine ("Unknown kickstand position: %d", position);
+    }
+#else
+    kickstandIRExperimental ();
+#endif
 
-    setSpeedsCrawlBack ();
-    sleep (BACKUP_DURATION);
-    setSpeedsRotateRight ();
-    sleep (ROTATE_DURATION);
-    setSpeedsCrawlAhead ();
-    sleep (FIRST_FORWARD_DURATION);
-    setSpeedsRotateLeft ();
-    sleep (ROTATE_DURATION);
-    setSpeedsAllAheadFull ();
-    sleep (RAMMING_DURATION);
     setSpeedsStop ();
 }
 
-void guidedIRForward () {
+// Drive forward to the IR beacon. Return the number of times it senses
+// "too far left" minus the number of times it senses "too far right."
+int guidedIRForward () {
+    const int TOO_CLOSE = 40;
+    const int POWER_DIFFERENCE_THRESHOLD = 10;
     int zero_count = 0;
 
     setSpeedsSpiritedAhead ();
     sleep (0.1);
 
-    while (5 > zero_count) {
+    int balance = 0;
+    bool quit = false;
+    while (!quit) {
         int l_dir = irDirLeft ();
         int r_dir = irDirRight ();
 
-        writeDebugStreamLine ("Direction: %d, %d", l_dir, r_dir);
-
-        if (0 == l_dir || 0 == r_dir) {
-            ++zero_count;
-        }
+        writeDebugStreamLine ("Guided IR: Direction: %d, %d", l_dir, r_dir);
 
         if (LEFT_SENSOR_CENTER == l_dir && RIGHT_SENSOR_CENTER == r_dir) {
             int left = irPowerLeft ();
             int right = irPowerRight ();
-            writeDebugStreamLine ("Power: %d, %d", left, right);
+            writeDebugStreamLine ("Guided IR: Power: %d, %d", left, right);
+
+            if (TOO_CLOSE > (left + right)) {
+                break;
+            }
 
             int diff = left - right;
-            if (10 > abs (diff)) {
-                setSpeeds (20, 20);
+            if (POWER_DIFFERENCE_THRESHOLD > abs (diff)) {
+                writeDebugStreamLine ("Guided IR: Simple Forward");
+                setSpeedsSlowlyAhead ();
             } else if (left > right) {
-                writeDebugStreamLine ("Turn Left");
-                setSpeedsLeftTurn ();
+                writeDebugStreamLine ("Guided IR: Turn Left");
+                setSpeedsLeftTurnSmall ();
+                ++balance;
             } else { // left < right
-                writeDebugStreamLine ("Turn Right");
-                setSpeedsRightTurn ();
+                writeDebugStreamLine ("Guided IR: Turn Right");
+                setSpeedsRightTurnSmall ();
+                --balance;
             }
+        } else {
+            quit = true;
         }
         sleep (0.01);
     }
 
-    writeDebugStreamLine ("Done!");
+    writeDebugStreamLine ("Guided IR: Done!");
     setSpeedsStop ();
+
+    return balance;
 }
 
-bool doneDrivingForwardTowardsPositionOne () {
-#ifdef SENSORS_FORWARD
-    return 9 == irDirRight ();
-#else
-    return 5 == irDirLeft ();
-#endif
-}
+bool doneDrivingForwardTowardsPositionOne () { return 9 == irDirRight (); }
 
 void driveToPositionOne () {
     const float INITIAL_FORWARD_DURATION = 0.1;
-    const float INITIAL_LEFT_TURN_DURATION = 1.0;
+    const float INITIAL_LEFT_TURN_DURATION = .60;
 
     // Get away from the wall
+    writeDebugStreamLine ("Position One: Initial Forward");
     setSpeedsSpiritedAhead ();
-    sleep (0.1);
+    sleep (INITIAL_FORWARD_DURATION);
 
     // Turn left a bit
+    writeDebugStreamLine ("Position One: Initial Left");
     setSpeedsLeftPivot ();
     sleep (INITIAL_LEFT_TURN_DURATION);
 
     // Drive forward until the IR beacon is at position 9 for the right
     // IR sensor
 
+    writeDebugStreamLine ("Position One: Forward Until IR");
     int iterations = 0;
-    const int MAX_FORWARD_ITERATIONS = 30;
+    const int MAX_FORWARD_ITERATIONS = 15;
     setSpeedsSpiritedAhead ();
     while (MAX_FORWARD_ITERATIONS > iterations++) {
         if (doneDrivingForwardTowardsPositionOne ()) {
@@ -201,15 +289,16 @@ void driveToPositionOne () {
         }
         sleep (0.1);
     }
-    writeDebugStreamLine ("Finished going forward after %d iterations",
-                          iterations);
+    writeDebugStreamLine (
+        "Position One: Finished going forward after %d iterations", iterations);
+    writeDebugStreamLine ("Position One: Turn towards IR beacon");
 
     // Turn right until the IR beacon is at position 5 for both sensors
     // and the power difference between the two is minimal.
     setSpeedsRightPivot ();
     iterations = 0;
     const int MAX_ROTATE_ITERATIONS = 20;
-    const int POWER_SAME_THRESHOLD = 10;
+    const int POWER_SAME_THRESHOLD = 20;
     while (MAX_ROTATE_ITERATIONS > iterations++) {
         int right_dir = irDirRight ();
         int left_dir = irDirLeft ();
@@ -230,28 +319,52 @@ void driveToPositionOne () {
 
     // Stop!
     setSpeedsStop ();
-    writeDebugStreamLine ("Finished turning right after %d iterations",
-                          iterations);
+    writeDebugStreamLine (
+        "Position One: Finished turning right after %d iterations", iterations);
 }
 
-void driveToCenterGoal () {
+// Drive to the center goal. Return the position number that you believe the
+// center goal is in.
+int driveToCenterGoal () {
     int left = irDirLeft ();
     int right = irDirRight ();
 
+    bool position_one = false;
     // The center goal shows up at 5/5
     if (5 != left || 5 != right) {
+        position_one = true;
         driveToPositionOne ();
     }
 
-    guidedIRForward ();
+    int balance = guidedIRForward ();
+    // setSpeeds(-50, -50);
+    // sleep(0.4);
+    setSpeedsStop ();
+
+    int position = 0;
+    if (position_one) {
+        position = 1;
+    } else {
+        if (balance > 0) { // if we turned right more than left
+            position = 2;
+        } else {
+            position = 3;
+        }
+    }
+
+    writeDebugStreamLine ("The center element is in position %d", position);
+
+    return position;
 }
 
 task main () {
-    initialize_robot ();
+    // initialize_robot ();
 
     // waitForStart();
 
-    driveToCenterGoal ();
+    int position = driveToCenterGoal ();
     dumpBallsInCenterGoal ();
-    knockOverKickstand ();
+    knockOverKickstand (position);
+
+    writeDebugStreamLine ("Done!!");
 }
