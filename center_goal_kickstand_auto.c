@@ -22,7 +22,7 @@
 #include "JoystickDriver.c"
 #include "autonomous_functions.h"
 
-void initialize_robot () {
+void initializeRobot () {
     servo[BALL_DUMP] = 0;
     servo[TUBE_MAN_B] = 0;
 }
@@ -176,12 +176,9 @@ void kickstandIRExperimental () {
     driveFor (100, 100, .5);
 }
 
-// Assumes that we've just dumped in the center goal. We're a few inches
-// away from the game element. So we'll nedd to back up a bit, turn right
-// 45 degrees, drive forward a bit, turn left 45 degrees and then drive
-// forward in a spirited way.
 void knockOverKickstand (int position) {
 #ifdef USE_CHOSEN_POSITION
+    writeDebugStreamLine ("Dead reckoning for the kickstand");
     if (1 == position) {
         kickstandPositionOne ();
     } else if (2 == position) {
@@ -192,6 +189,7 @@ void knockOverKickstand (int position) {
         writeDebugStreamLine ("Unknown kickstand position: %d", position);
     }
 #else
+    writeDebugStreamLine ("IR seeking for the kickstand");
     kickstandIRExperimental ();
 #endif
 
@@ -316,22 +314,18 @@ int driveToCenterGoal () {
     int left = irDirLeft ();
     int right = irDirRight ();
 
-    bool position_one = false;
+    int position = 0;
     // The center goal shows up at 5/5
     if (5 != left || 5 != right) {
-        position_one = true;
+        position = 1;
         driveToPositionOne ();
     }
 
     int balance = guidedIRForward ();
-    // setSpeeds(-50, -50);
-    // sleep(0.4);
+
     allStop ();
 
-    int position = 0;
-    if (position_one) {
-        position = 1;
-    } else {
+    if (position < 1) {
         if (balance > 0) { // if we turned right more than left
             position = 2;
         } else {
@@ -346,7 +340,7 @@ int driveToCenterGoal () {
 
 task main () {
     // waitForStart();
-    initialize_robot ();
+    initializeRobot ();
 
     int position = driveToCenterGoal ();
     dumpBallsInCenterGoal ();
